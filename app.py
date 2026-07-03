@@ -47,6 +47,16 @@ def compare_keys(key1, key2):
 def key_to_string(key):
     if key is None:
         return "Atanmadı"
+    if isinstance(key, Button):
+        translations = {
+            "left": "Sol Tık",
+            "right": "Sağ Tık",
+            "middle": "Orta Tık (Scroll)",
+            "x1": "Yan Tuş 1 (Mouse 4)",
+            "x2": "Yan Tuş 2 (Mouse 5)"
+        }
+        name = key.name if hasattr(key, 'name') else str(key)
+        return translations.get(name.lower(), name.upper())
     if isinstance(key, Key):
         name = key.name
         translations = {
@@ -88,7 +98,7 @@ class MouseClicker(threading.Thread):
     def __init__(self):
         super().__init__()
         self.cps = 10
-        self.button = Button.left
+        self.buttons = [Button.left]
         self.running = False
         self.program_running = True
         self.daemon = True
@@ -109,7 +119,8 @@ class MouseClicker(threading.Thread):
         while self.program_running:
             if self.running:
                 try:
-                    mouse_controller.click(self.button)
+                    for button in self.buttons:
+                        mouse_controller.click(button)
                 except Exception:
                     pass
                 time.sleep(1.0 / self.cps)
@@ -242,13 +253,17 @@ class MantıClickerApp(ctk.CTk):
         self.listener = keyboard.Listener(on_press=self.on_global_key_press)
         self.listener.start()
 
+        # Global Fare Dinleyicisini Başlat
+        self.mouse_listener = mouse.Listener(on_click=self.on_global_mouse_click)
+        self.mouse_listener.start()
+
     def setup_mouse_tab(self):
         # Sol/Sağ Tık Seçimi
         self.lbl_btn = ctk.CTkLabel(self.tab_mouse, text="Fare Tuşu:", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
         self.lbl_btn.grid(row=0, column=0, padx=20, pady=12, sticky="w")
         
         self.combo_btn = ctk.CTkOptionMenu(
-            self.tab_mouse, values=["Sol Tık (Left)", "Sağ Tık (Right)"],
+            self.tab_mouse, values=["Sol Tık (Left)", "Sağ Tık (Right)", "Sol & Sağ Tık (Both)"],
             command=self.update_mouse_settings
         )
         self.combo_btn.grid(row=0, column=1, padx=20, pady=12, sticky="e")
@@ -431,10 +446,12 @@ class MantıClickerApp(ctk.CTk):
     # Ayarları Motorlara Aktarma
     def update_mouse_settings(self, event=None):
         btn_text = self.combo_btn.get()
-        if "Sol" in btn_text:
-            clicker.button = Button.left
+        if "Sol & Sağ" in btn_text:
+            clicker.buttons = [Button.left, Button.right]
+        elif "Sol" in btn_text:
+            clicker.buttons = [Button.left]
         else:
-            clicker.button = Button.right
+            clicker.buttons = [Button.right]
         
         try:
             clicker.cps = int(self.slider_cps.get())
@@ -492,6 +509,17 @@ class MantıClickerApp(ctk.CTk):
         self.lbl_k_target_list.configure(text=self.get_keys_list_string())
         self.btn_m_toggle.configure(text=f"BAŞLAT ({key_to_string(mouse_hotkey)})")
         self.btn_k_toggle.configure(text=f"BAŞLAT ({key_to_string(keyboard_hotkey)})")
+
+    # Global Fare Tıklama Yakalayıcı
+    def on_global_mouse_click(self, x, y, button, pressed):
+        if pressed:
+            global binding_mode
+            if binding_mode is not None:
+                if binding_mode == "keyboard_target":
+                    return
+                if button in [Button.left, Button.right]:
+                    return
+            self.on_global_key_press(button)
 
     # Global Kısayol Yakalayıcı
     def on_global_key_press(self, key):
@@ -594,9 +622,13 @@ class MantıClickerApp(ctk.CTk):
         keyer.program_running = False
         keyer.stop_keyer()
         
-        # Listener'ı durdur
+        # Listener'ları durdur
         try:
             self.listener.stop()
+        except Exception:
+            pass
+        try:
+            self.mouse_listener.stop()
         except Exception:
             pass
             
