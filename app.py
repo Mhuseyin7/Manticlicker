@@ -238,7 +238,8 @@ mouse_controller = MouseController()
 keyboard_controller = keyboard.Controller()
 
 # Varsayılan Tuş Atamaları
-mouse_hotkey = Key.f7
+mouse_hotkey_left = Key.f7
+mouse_hotkey_right = Key.f8
 keyboard_hotkey = Key.f6
 keyboard_target_keys = [KeyCode.from_char('e')]
 
@@ -319,10 +320,10 @@ def key_to_string(key):
 # ══════════════════════════════════════════════════════════════
 
 class MouseClicker(threading.Thread):
-    def __init__(self):
+    def __init__(self, button=Button.left):
         super().__init__()
         self.cps = 10
-        self.buttons = [Button.left]
+        self.button = button
         self.jitter = False
         self.running = False
         self.program_running = True
@@ -344,8 +345,7 @@ class MouseClicker(threading.Thread):
         while self.program_running:
             if self.running:
                 try:
-                    for button in self.buttons:
-                        mouse_controller.click(button)
+                    mouse_controller.click(self.button)
                 except Exception:
                     pass
                 delay = 1.0 / self.cps
@@ -434,8 +434,11 @@ class KeyboardKeyer(threading.Thread):
                 time.sleep(0.01)
 
 # Motor Nesnelerini Başlat
-clicker = MouseClicker()
-clicker.start()
+clicker_left = MouseClicker(button=Button.left)
+clicker_left.start()
+
+clicker_right = MouseClicker(button=Button.right)
+clicker_right.start()
 
 keyer = KeyboardKeyer()
 keyer.start()
@@ -701,28 +704,6 @@ class MantıClickerApp(ctk.CTk):
         SectionTitle(card1, "Tıklama Ayarları", icon="🎯").pack(
             fill="x", padx=16, pady=(12, 8))
 
-        # Fare Tuşu Satırı
-        row_btn = ctk.CTkFrame(card1, fg_color="transparent")
-        row_btn.pack(fill="x", padx=16, pady=(0, 8))
-
-        FieldLabel(row_btn, text="Fare Tuşu").pack(side="left")
-        self.combo_btn = ctk.CTkOptionMenu(
-            row_btn,
-            values=["Sol Tık (Left)", "Sağ Tık (Right)", "Sol & Sağ Tık (Both)"],
-            command=self.update_mouse_settings,
-            width=180,
-            height=32,
-            corner_radius=8,
-            fg_color=COLORS["bg_input"],
-            button_color=COLORS["accent"],
-            button_hover_color=COLORS["accent_hover"],
-            dropdown_fg_color=COLORS["bg_card"],
-            dropdown_hover_color=COLORS["bg_card_hover"],
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-        )
-        self.combo_btn.pack(side="right")
-        self.combo_btn.set("Sol Tık (Left)")
-
         # CPS Satırı
         row_cps = ctk.CTkFrame(card1, fg_color="transparent")
         row_cps.pack(fill="x", padx=16, pady=(0, 12))
@@ -761,65 +742,81 @@ class MantıClickerApp(ctk.CTk):
         SectionTitle(card2, "Kontrol", icon="⚡").pack(
             fill="x", padx=16, pady=(12, 8))
 
-        # Kısayol Satırı
-        row_hk = ctk.CTkFrame(card2, fg_color="transparent")
-        row_hk.pack(fill="x", padx=16, pady=(0, 8))
+        # Sol Tık Kısayol Satırı
+        row_hk_left = ctk.CTkFrame(card2, fg_color="transparent")
+        row_hk_left.pack(fill="x", padx=16, pady=(0, 8))
 
-        FieldLabel(row_hk, text="Çalıştırma Kısayolu").pack(side="left")
-        self.btn_m_hk = ctk.CTkButton(
-            row_hk, text=key_to_string(mouse_hotkey),
+        FieldLabel(row_hk_left, text="Sol Tık Kısayolu").pack(side="left")
+        self.btn_m_hk_left = ctk.CTkButton(
+            row_hk_left, text=key_to_string(mouse_hotkey_left),
             width=140, height=32, corner_radius=8,
-            fg_color=COLORS["bg_input"],
-            hover_color=COLORS["bg_card_hover"],
+            fg_color=COLORS["bg_input"], hover_color=COLORS["bg_card_hover"],
             border_width=1, border_color=COLORS["border"],
-            text_color=COLORS["text_primary"],
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-            command=lambda: self.start_binding("mouse_hotkey")
+            text_color=COLORS["text_primary"], font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            command=lambda: self.start_binding("mouse_hotkey_left")
         )
-        self.btn_m_hk.pack(side="right")
+        self.btn_m_hk_left.pack(side="right")
 
-        # Durum Satırı
-        row_status = ctk.CTkFrame(card2, fg_color="transparent")
-        row_status.pack(fill="x", padx=16, pady=(0, 8))
+        # Sağ Tık Kısayol Satırı
+        row_hk_right = ctk.CTkFrame(card2, fg_color="transparent")
+        row_hk_right.pack(fill="x", padx=16, pady=(0, 8))
 
-        FieldLabel(row_status, text="Durum").pack(side="left")
-
-        status_right = ctk.CTkFrame(row_status, fg_color="transparent")
-        status_right.pack(side="right")
-
-        self.m_status_indicator = NeonStatusLED(status_right, size=24,
-                                                bg_color=COLORS["bg_dark"])
-        self.m_status_indicator.pack(side="right", padx=(8, 0))
-
-        self.lbl_m_status = ctk.CTkLabel(
-            status_right, text="PASİF",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
-            text_color=COLORS["danger"]
+        FieldLabel(row_hk_right, text="Sağ Tık Kısayolu").pack(side="left")
+        self.btn_m_hk_right = ctk.CTkButton(
+            row_hk_right, text=key_to_string(mouse_hotkey_right),
+            width=140, height=32, corner_radius=8,
+            fg_color=COLORS["bg_input"], hover_color=COLORS["bg_card_hover"],
+            border_width=1, border_color=COLORS["border"],
+            text_color=COLORS["text_primary"], font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            command=lambda: self.start_binding("mouse_hotkey_right")
         )
-        self.lbl_m_status.pack(side="right")
+        self.btn_m_hk_right.pack(side="right")
+
+        # Durum Satırı - Sol
+        row_status_l = ctk.CTkFrame(card2, fg_color="transparent")
+        row_status_l.pack(fill="x", padx=16, pady=(0, 4))
+        FieldLabel(row_status_l, text="Sol Tık Durum").pack(side="left")
+        status_l_right = ctk.CTkFrame(row_status_l, fg_color="transparent")
+        status_l_right.pack(side="right")
+        self.m_status_l_ind = NeonStatusLED(status_l_right, size=20, bg_color=COLORS["bg_dark"])
+        self.m_status_l_ind.pack(side="right", padx=(8, 0))
+        self.lbl_m_status_l = ctk.CTkLabel(status_l_right, text="PASİF", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"), text_color=COLORS["danger"])
+        self.lbl_m_status_l.pack(side="right")
+
+        # Durum Satırı - Sağ
+        row_status_r = ctk.CTkFrame(card2, fg_color="transparent")
+        row_status_r.pack(fill="x", padx=16, pady=(0, 8))
+        FieldLabel(row_status_r, text="Sağ Tık Durum").pack(side="left")
+        status_r_right = ctk.CTkFrame(row_status_r, fg_color="transparent")
+        status_r_right.pack(side="right")
+        self.m_status_r_ind = NeonStatusLED(status_r_right, size=20, bg_color=COLORS["bg_dark"])
+        self.m_status_r_ind.pack(side="right", padx=(8, 0))
+        self.lbl_m_status_r = ctk.CTkLabel(status_r_right, text="PASİF", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"), text_color=COLORS["danger"])
+        self.lbl_m_status_r.pack(side="right")
 
         # Anti-Cheat Checkbox
         self.var_m_jitter = ctk.BooleanVar(value=False)
         self.chk_m_jitter = ctk.CTkCheckBox(
             card2, text="  Anti-Cheat Koruması (Rastgele Jitter Tıklama)",
-            variable=self.var_m_jitter,
-            command=self.update_mouse_settings,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-            text_color=COLORS["text_secondary"],
-            fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"],
-            border_color=COLORS["border"],
-            checkmark_color=COLORS["text_primary"],
-            corner_radius=6,
+            variable=self.var_m_jitter, command=self.update_mouse_settings,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=COLORS["text_secondary"],
+            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            border_color=COLORS["border"], checkmark_color=COLORS["text_primary"], corner_radius=6,
         )
         self.chk_m_jitter.pack(padx=16, pady=(0, 12), anchor="w")
 
-        # ── Ana Aksiyon Butonu ──
-        self.btn_m_toggle = BigActionButton(
-            container, text=f"▶  BAŞLAT  ({key_to_string(mouse_hotkey)})",
-            command=self.toggle_mouse_macro
+        # ── Ana Aksiyon Butonları ──
+        self.btn_m_toggle_left = BigActionButton(
+            container, text=f"▶  SOL TIK BAŞLAT  ({key_to_string(mouse_hotkey_left)})",
+            command=self.toggle_mouse_left, height=40
         )
-        self.btn_m_toggle.pack(fill="x", padx=16, pady=(8, 8))
+        self.btn_m_toggle_left.pack(fill="x", padx=16, pady=(4, 4))
+        
+        self.btn_m_toggle_right = BigActionButton(
+            container, text=f"▶  SAĞ TIK BAŞLAT  ({key_to_string(mouse_hotkey_right)})",
+            command=self.toggle_mouse_right, height=40
+        )
+        self.btn_m_toggle_right.pack(fill="x", padx=16, pady=(0, 8))
 
     # ══════════════════════════════════════════════════════
     #  KLAVYE MAKROSU SEKMESİ
@@ -1130,20 +1127,17 @@ class MantıClickerApp(ctk.CTk):
 
     # Ayarları Motorlara Aktarma
     def update_mouse_settings(self, event=None):
-        btn_text = self.combo_btn.get()
-        if "Sol & Sağ" in btn_text:
-            clicker.buttons = [Button.left, Button.right]
-        elif "Sol" in btn_text:
-            clicker.buttons = [Button.left]
-        else:
-            clicker.buttons = [Button.right]
-
         try:
-            clicker.cps = int(self.slider_cps.get())
+            cps = int(self.slider_cps.get())
         except ValueError:
-            clicker.cps = 10
+            cps = 10
 
-        clicker.jitter = self.var_m_jitter.get() if hasattr(self, 'var_m_jitter') else False
+        clicker_left.cps = cps
+        clicker_right.cps = cps
+
+        jitter = self.var_m_jitter.get() if hasattr(self, 'var_m_jitter') else False
+        clicker_left.jitter = jitter
+        clicker_right.jitter = jitter
 
     def update_keyboard_settings(self, event=None):
         global keyboard_target_keys
@@ -1181,13 +1175,12 @@ class MantıClickerApp(ctk.CTk):
         global binding_mode
         binding_mode = mode
 
-        if mode == "mouse_hotkey":
-            self.status_bar.configure(
-                text="⏳  Kısayol Tuşu bekleniyor... İptal için ESC.",
-                text_color=COLORS["warning"])
-            self.btn_m_hk.configure(text="⌛ Basın...",
-                                    fg_color=COLORS["warning"],
-                                    text_color=COLORS["bg_deep"])
+        if mode == "mouse_hotkey_left":
+            self.status_bar.configure(text="⏳  Sol Tık Kısayol Tuşu bekleniyor... İptal için ESC.", text_color=COLORS["warning"])
+            self.btn_m_hk_left.configure(text="⌛ Basın...", fg_color=COLORS["warning"], text_color=COLORS["bg_deep"])
+        elif mode == "mouse_hotkey_right":
+            self.status_bar.configure(text="⏳  Sağ Tık Kısayol Tuşu bekleniyor... İptal için ESC.", text_color=COLORS["warning"])
+            self.btn_m_hk_right.configure(text="⌛ Basın...", fg_color=COLORS["warning"], text_color=COLORS["bg_deep"])
         elif mode == "keyboard_hotkey":
             self.status_bar.configure(
                 text="⏳  Kısayol Tuşu bekleniyor... İptal için ESC.",
@@ -1206,11 +1199,12 @@ class MantıClickerApp(ctk.CTk):
         self.status_bar.configure(
             text="⚡  Hazır — Kısayol tuşlarıyla arka planda çalıştırabilirsiniz.",
             text_color=COLORS["text_muted"])
-        self.btn_m_hk.configure(
-            text=key_to_string(mouse_hotkey),
-            fg_color=COLORS["bg_input"],
-            text_color=COLORS["text_primary"],
-            hover_color=COLORS["bg_card_hover"])
+        self.btn_m_hk_left.configure(
+            text=key_to_string(mouse_hotkey_left),
+            fg_color=COLORS["bg_input"], text_color=COLORS["text_primary"], hover_color=COLORS["bg_card_hover"])
+        self.btn_m_hk_right.configure(
+            text=key_to_string(mouse_hotkey_right),
+            fg_color=COLORS["bg_input"], text_color=COLORS["text_primary"], hover_color=COLORS["bg_card_hover"])
         self.btn_k_hk.configure(
             text=key_to_string(keyboard_hotkey),
             fg_color=COLORS["bg_input"],
@@ -1221,7 +1215,8 @@ class MantıClickerApp(ctk.CTk):
             fg_color=COLORS["success"],
             hover_color=COLORS["success_glow"])
         self.lbl_k_target_list.configure(text=self.get_keys_list_string())
-        self.btn_m_toggle.configure(text=f"▶  BAŞLAT  ({key_to_string(mouse_hotkey)})")
+        self.btn_m_toggle_left.configure(text=f"▶  SOL TIK BAŞLAT  ({key_to_string(mouse_hotkey_left)})")
+        self.btn_m_toggle_right.configure(text=f"▶  SAĞ TIK BAŞLAT  ({key_to_string(mouse_hotkey_right)})")
         self.btn_k_toggle.configure(text=f"▶  BAŞLAT  ({key_to_string(keyboard_hotkey)})")
 
     # ── Global Fare Tıklama Yakalayıcı ──
@@ -1239,7 +1234,7 @@ class MantıClickerApp(ctk.CTk):
     # ── Global Kısayol Yakalayıcı ──
 
     def on_global_key_press(self, key):
-        global binding_mode, mouse_hotkey, keyboard_hotkey, keyboard_target_keys
+        global binding_mode, mouse_hotkey_left, mouse_hotkey_right, keyboard_hotkey, keyboard_target_keys
 
         if binding_mode is not None:
             if key == Key.esc:
@@ -1247,22 +1242,23 @@ class MantıClickerApp(ctk.CTk):
                 self.after(0, self.stop_binding_ui)
                 return
 
-            if binding_mode == "mouse_hotkey":
-                if compare_keys(key, keyboard_hotkey):
-                    self.after(0, lambda: messagebox.showwarning(
-                        "Kısayol Çakışması",
-                        "Bu kısayol tuşu Klavye Makrosu tarafından kullanılmaktadır."))
+            if binding_mode == "mouse_hotkey_left":
+                if compare_keys(key, keyboard_hotkey) or compare_keys(key, mouse_hotkey_right):
+                    self.after(0, lambda: messagebox.showwarning("Çakışma", "Bu tuş zaten kullanımda."))
                 else:
-                    mouse_hotkey = key
+                    mouse_hotkey_left = key
+            elif binding_mode == "mouse_hotkey_right":
+                if compare_keys(key, keyboard_hotkey) or compare_keys(key, mouse_hotkey_left):
+                    self.after(0, lambda: messagebox.showwarning("Çakışma", "Bu tuş zaten kullanımda."))
+                else:
+                    mouse_hotkey_right = key
             elif binding_mode == "keyboard_hotkey":
-                if compare_keys(key, mouse_hotkey):
-                    self.after(0, lambda: messagebox.showwarning(
-                        "Kısayol Çakışması",
-                        "Bu kısayol tuşu Fare Makrosu tarafından kullanılmaktadır."))
+                if compare_keys(key, mouse_hotkey_left) or compare_keys(key, mouse_hotkey_right):
+                    self.after(0, lambda: messagebox.showwarning("Çakışma", "Bu tuş Fare Makrosu tarafından kullanılmaktadır."))
                 else:
                     keyboard_hotkey = key
             elif binding_mode == "keyboard_target":
-                if compare_keys(key, keyboard_hotkey) or compare_keys(key, mouse_hotkey):
+                if compare_keys(key, keyboard_hotkey) or compare_keys(key, mouse_hotkey_left) or compare_keys(key, mouse_hotkey_right):
                     self.after(0, lambda: messagebox.showwarning(
                         "Çakışma Hatası",
                         "Hedef tuş, Kısayol Tuşları ile aynı olamaz."))
@@ -1280,46 +1276,73 @@ class MantıClickerApp(ctk.CTk):
             self.after(0, self.update_keyboard_settings)
             return
 
-        if compare_keys(key, mouse_hotkey):
-            self.after(0, self.toggle_mouse_macro)
+        if compare_keys(key, mouse_hotkey_left):
+            self.after(0, self.toggle_mouse_left)
+        elif compare_keys(key, mouse_hotkey_right):
+            self.after(0, self.toggle_mouse_right)
         elif compare_keys(key, keyboard_hotkey):
             self.after(0, self.toggle_keyboard_macro)
 
     # ── Fare Makrosu Başlat / Durdur ──
 
-    def toggle_mouse_macro(self):
-        if clicker.running:
-            clicker.stop_clicking()
+    # ── Fare Makrosu Başlat / Durdur (SOL TIK) ──
+    def toggle_mouse_left(self):
+        if clicker_left.running:
+            clicker_left.stop_clicking()
             self.trigger_sound("stop")
-            self.lbl_m_status.configure(text="PASİF", text_color=COLORS["danger"])
-            self.m_status_indicator.set_status(False)
-            self.btn_m_toggle.configure(
-                text=f"▶  BAŞLAT  ({key_to_string(mouse_hotkey)})",
-                fg_color=COLORS["accent"],
-                hover_color=COLORS["accent_hover"],
-                border_color=COLORS["accent"])
-            self.btn_m_toggle.set_active(False)
-            self.combo_btn.configure(state="normal")
+            self.lbl_m_status_l.configure(text="PASİF", text_color=COLORS["danger"])
+            self.m_status_l_ind.set_status(False)
+            self.btn_m_toggle_left.configure(
+                text=f"▶  SOL TIK BAŞLAT  ({key_to_string(mouse_hotkey_left)})",
+                fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], border_color=COLORS["accent"])
+            self.btn_m_toggle_left.set_active(False)
             self.slider_cps.configure(state="normal")
             self.entry_cps.configure(state="normal")
-            self.btn_m_hk.configure(state="normal")
+            self.btn_m_hk_left.configure(state="normal")
             self.chk_m_jitter.configure(state="normal")
         else:
             self.update_mouse_settings()
-            clicker.start_clicking()
+            clicker_left.start_clicking()
             self.trigger_sound("start")
-            self.lbl_m_status.configure(text="AKTİF", text_color=COLORS["success"])
-            self.m_status_indicator.set_status(True)
-            self.btn_m_toggle.configure(
-                text=f"⏹  DURDUR  ({key_to_string(mouse_hotkey)})",
-                fg_color=COLORS["danger"],
-                hover_color=COLORS["danger_hover"],
-                border_color=COLORS["danger"])
-            self.btn_m_toggle.set_active(True)
-            self.combo_btn.configure(state="disabled")
+            self.lbl_m_status_l.configure(text="AKTİF", text_color=COLORS["success"])
+            self.m_status_l_ind.set_status(True)
+            self.btn_m_toggle_left.configure(
+                text=f"⏹  DURDUR  ({key_to_string(mouse_hotkey_left)})",
+                fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], border_color=COLORS["danger"])
+            self.btn_m_toggle_left.set_active(True)
             self.slider_cps.configure(state="disabled")
             self.entry_cps.configure(state="disabled")
-            self.btn_m_hk.configure(state="disabled")
+            self.btn_m_hk_left.configure(state="disabled")
+            self.chk_m_jitter.configure(state="disabled")
+
+    # ── Fare Makrosu Başlat / Durdur (SAĞ TIK) ──
+    def toggle_mouse_right(self):
+        if clicker_right.running:
+            clicker_right.stop_clicking()
+            self.trigger_sound("stop")
+            self.lbl_m_status_r.configure(text="PASİF", text_color=COLORS["danger"])
+            self.m_status_r_ind.set_status(False)
+            self.btn_m_toggle_right.configure(
+                text=f"▶  SAĞ TIK BAŞLAT  ({key_to_string(mouse_hotkey_right)})",
+                fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], border_color=COLORS["accent"])
+            self.btn_m_toggle_right.set_active(False)
+            self.slider_cps.configure(state="normal")
+            self.entry_cps.configure(state="normal")
+            self.btn_m_hk_right.configure(state="normal")
+            self.chk_m_jitter.configure(state="normal")
+        else:
+            self.update_mouse_settings()
+            clicker_right.start_clicking()
+            self.trigger_sound("start")
+            self.lbl_m_status_r.configure(text="AKTİF", text_color=COLORS["success"])
+            self.m_status_r_ind.set_status(True)
+            self.btn_m_toggle_right.configure(
+                text=f"⏹  DURDUR  ({key_to_string(mouse_hotkey_right)})",
+                fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], border_color=COLORS["danger"])
+            self.btn_m_toggle_right.set_active(True)
+            self.slider_cps.configure(state="disabled")
+            self.entry_cps.configure(state="disabled")
+            self.btn_m_hk_right.configure(state="disabled")
             self.chk_m_jitter.configure(state="disabled")
 
     # ── Klavye Makrosu Başlat / Durdur ──
@@ -1445,12 +1468,12 @@ class MantıClickerApp(ctk.CTk):
             return
 
         try:
-            global mouse_hotkey, keyboard_hotkey, keyboard_target_keys
+            global mouse_hotkey_left, mouse_hotkey_right, keyboard_hotkey, keyboard_target_keys
 
             profile_data = {
-                "mouse_button": self.combo_btn.get(),
                 "mouse_cps": int(self.slider_cps.get()),
-                "mouse_hotkey": serialize_key(mouse_hotkey),
+                "mouse_hotkey_left": serialize_key(mouse_hotkey_left),
+                "mouse_hotkey_right": serialize_key(mouse_hotkey_right),
                 "mouse_jitter": self.var_m_jitter.get(),
                 "keyboard_target_keys": [serialize_key(k) for k in keyboard_target_keys],
                 "keyboard_mode": self.seg_k_mode.get(),
@@ -1479,22 +1502,32 @@ class MantıClickerApp(ctk.CTk):
             return
 
         try:
-            global mouse_hotkey, keyboard_hotkey, keyboard_target_keys
+            global mouse_hotkey_left, mouse_hotkey_right, keyboard_hotkey, keyboard_target_keys
 
             with open(file_path, 'r', encoding='utf-8') as f:
                 profile_data = json.load(f)
 
-            if "mouse_button" in profile_data:
-                self.combo_btn.set(profile_data["mouse_button"])
             if "mouse_cps" in profile_data:
                 cps = profile_data["mouse_cps"]
                 self.slider_cps.set(cps)
                 self.entry_cps.delete(0, "end")
                 self.entry_cps.insert(0, str(cps))
-            if "mouse_hotkey" in profile_data:
+                
+            if "mouse_hotkey_left" in profile_data:
+                loaded_m_hk_l = deserialize_key(profile_data["mouse_hotkey_left"])
+                if loaded_m_hk_l:
+                    mouse_hotkey_left = loaded_m_hk_l
+            if "mouse_hotkey_right" in profile_data:
+                loaded_m_hk_r = deserialize_key(profile_data["mouse_hotkey_right"])
+                if loaded_m_hk_r:
+                    mouse_hotkey_right = loaded_m_hk_r
+                    
+            # Eski profiller için geriye dönük uyumluluk
+            if "mouse_hotkey" in profile_data and "mouse_hotkey_left" not in profile_data:
                 loaded_m_hk = deserialize_key(profile_data["mouse_hotkey"])
                 if loaded_m_hk:
-                    mouse_hotkey = loaded_m_hk
+                    mouse_hotkey_left = loaded_m_hk
+
             if "mouse_jitter" in profile_data:
                 self.var_m_jitter.set(profile_data["mouse_jitter"])
 
