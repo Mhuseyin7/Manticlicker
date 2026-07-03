@@ -195,11 +195,11 @@ keyer = KeyboardKeyer()
 keyer.start()
 
 
-class AutoClickerApp(ctk.CTk):
+class MantıClickerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Mantı Clicker & Keyer")
+        self.title("MantıClicker")
         self.geometry("560x520")
         self.resizable(False, False)
 
@@ -208,7 +208,7 @@ class AutoClickerApp(ctk.CTk):
 
         # Başlık Bölümü
         self.title_label = ctk.CTkLabel(
-            self, text="Auto Clicker & Keyboard Keyer",
+            self, text="MantıClicker",
             font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
         )
         self.title_label.pack(pady=(15, 5))
@@ -604,5 +604,5 @@ class AutoClickerApp(ctk.CTk):
         sys.exit()
 
 if __name__ == "__main__":
-    app = AutoClickerApp()
+    app = MantıClickerApp()
     app.mainloop()
