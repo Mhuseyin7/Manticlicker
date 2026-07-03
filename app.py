@@ -488,12 +488,13 @@ class NeonButton(ctk.CTkButton):
         color = accent or COLORS["accent"]
         # Hover rengi hesapla (biraz daha açık)
         hover = kwargs.pop("hover_color", COLORS["accent_hover"])
+        height = kwargs.pop("height", 36)
         super().__init__(
             parent,
             text=text,
             font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
             corner_radius=10,
-            height=36,
+            height=height,
             fg_color=color,
             hover_color=hover,
             border_width=0,
@@ -503,12 +504,13 @@ class NeonButton(ctk.CTkButton):
 class BigActionButton(ctk.CTkButton):
     """Ana aksiyon butonu – geniş, dikkat çekici, pulse animasyonlu"""
     def __init__(self, parent, text, **kwargs):
+        height = kwargs.pop("height", 48)
         super().__init__(
             parent,
             text=text,
             font=ctk.CTkFont(family=FONT_FAMILY, size=15, weight="bold"),
             corner_radius=12,
-            height=48,
+            height=height,
             fg_color=COLORS["accent"],
             hover_color=COLORS["accent_hover"],
             border_width=2,
