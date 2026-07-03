@@ -1418,8 +1418,11 @@ class MantıClickerApp(ctk.CTk):
             self.quit_app_completely()
 
     def quit_app_completely(self):
-        clicker.program_running = False
-        clicker.stop_clicking()
+        clicker_left.program_running = False
+        clicker_left.stop_clicking()
+        
+        clicker_right.program_running = False
+        clicker_right.stop_clicking()
 
         keyer.program_running = False
         keyer.stop_keyer()
