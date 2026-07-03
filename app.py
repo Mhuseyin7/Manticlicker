@@ -46,34 +46,39 @@ def deserialize_key(data):
 
 # Premium Logo Üretici
 def create_premium_logo():
-    img = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
+    # 128x128 high-quality logo with transparent background
+    img = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # Parıltılı dış daireler
-    for r in range(58, 46, -1):
-        alpha = int(120 * (1 - (58 - r) / 12))
-        draw.ellipse([60-r, 60-r, 60+r, 60+r], outline=(241, 196, 15, alpha), width=1)
+    # Outer neon glowing ring (Cyan/Blue gradient simulation)
+    for r in range(60, 50, -1):
+        alpha = int(140 * (1 - (60 - r) / 10))
+        ratio = (60 - r) / 10.0
+        rc = int(0 * (1 - ratio) + 0 * ratio)
+        gc = int(255 * (1 - ratio) + 120 * ratio)
+        bc = int(240 * (1 - ratio) + 255 * ratio)
+        draw.ellipse([64-r, 64-r, 64+r, 64+r], outline=(rc, gc, bc, alpha), width=2)
         
-    # Koyu mavi taban
-    draw.ellipse([60-46, 60-46, 60+46, 60+46], fill=(30, 41, 59, 255))
+    # Dark modern central disk
+    draw.ellipse([64-48, 64-48, 64+48, 64+48], fill=(17, 24, 39, 255)) # Dark slate gray
     
-    # Mantı Şekli (Altın sarısı bohça)
-    draw.chord([60-25, 60-10, 60+25, 60+25], start=0, end=180, fill=(241, 196, 15, 255))
-    draw.polygon([(60-20, 60+10), (60-25, 60-15), (60-10, 60-5)], fill=(244, 208, 63, 255))
-    draw.polygon([(60+20, 60+10), (60+25, 60-15), (60+10, 60-5)], fill=(244, 208, 63, 255))
-    draw.polygon([(60-12, 60+5), (60, 60-22), (60+12, 60+5)], fill=(245, 215, 110, 255))
-    draw.ellipse([60-4, 60-24, 60+4, 60-16], fill=(241, 196, 15, 255))
+    # Draw sleek, dumpling (Mantı) shape in the center
+    draw.chord([64-22, 64-8, 64+22, 64+24], start=0, end=180, fill=(245, 158, 11, 255))
+    draw.polygon([(64-18, 64+8), (64-22, 64-12), (64-10, 64-3)], fill=(251, 191, 36, 255))
+    draw.polygon([(64+18, 64+8), (64+22, 64-12), (64+10, 64-3)], fill=(251, 191, 36, 255))
+    draw.polygon([(64-11, 64+3), (64, 64-18), (64+11, 64+3)], fill=(252, 211, 77, 255))
+    draw.ellipse([64-3, 64-20, 64+3, 64-14], fill=(245, 158, 11, 255))
 
-    # Tıklama İmleci (Cursor)
+    # Minimalist Neon Blue Cursor arrow
     cursor_points = [
-        (60+5, 60+5),
-        (60+23, 60+15),
-        (60+17, 60+17),
-        (60+23, 60+26)
+        (64+4, 64+4),
+        (64+22, 64+12),
+        (64+16, 64+16),
+        (64+22, 64+24)
     ]
-    draw.polygon([(x+2, y+2) for x, y in cursor_points], fill=(0, 0, 0, 100))
+    draw.polygon([(x+2, y+2) for x, y in cursor_points], fill=(0, 240, 255, 60))
     draw.polygon(cursor_points, fill=(255, 255, 255, 255))
-    draw.polygon(cursor_points, outline=(59, 130, 246, 255), width=2)
+    draw.polygon(cursor_points, outline=(0, 240, 255, 255), width=2)
     
     return img
 
@@ -348,6 +353,22 @@ class MantıClickerApp(ctk.CTk):
         
         # Fade-in Başlangıcı
         self.attributes('-alpha', 0.0)
+
+        # Pencere İkonunu Ayarla
+        if os.path.exists("logo.ico"):
+            try:
+                self.iconbitmap("logo.ico")
+            except Exception:
+                pass
+
+        # Windows Glassmorphism / Acrylic Efektlerini Uygula
+        try:
+            pywinstyles.apply_style(self, "acrylic")
+            pywinstyles.change_header_color(self, "#0f172a") # Slate-900
+            pywinstyles.change_border_color(self, "#3b82f6") # Blue-500
+            pywinstyles.change_title_color(self, "white")
+        except Exception:
+            pass
 
         # Genel Ayar Değişkenleri
         self.var_sound_enabled = ctk.BooleanVar(value=True)
