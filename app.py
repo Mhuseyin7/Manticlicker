@@ -2,11 +2,47 @@ import sys
 import os
 import threading
 import time
+import json
+import random
+import winsound
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from pynput import keyboard, mouse
 from pynput.keyboard import Key, KeyCode
 from pynput.mouse import Button, Controller as MouseController
+import pystray
+from pystray import MenuItem as item
+from PIL import Image, ImageDraw
+
+# Tuş / Buton serileştirme yardımcıları
+def serialize_key(key):
+    if key is None:
+        return None
+    if isinstance(key, Key):
+        return {"type": "Key", "name": key.name}
+    elif isinstance(key, KeyCode):
+        return {"type": "KeyCode", "char": key.char, "vk": key.vk}
+    elif isinstance(key, Button):
+        return {"type": "Button", "name": key.name}
+    return str(key)
+
+def deserialize_key(data):
+    if not data:
+        return None
+    if isinstance(data, dict):
+        t = data.get("type")
+        if t == "Key":
+            return getattr(Key, data["name"], None)
+        elif t == "KeyCode":
+            char = data.get("char")
+            vk = data.get("vk")
+            if char is not None:
+                return KeyCode.from_char(char)
+            elif vk is not None:
+                return KeyCode(vk=vk)
+        elif t == "Button":
+            return getattr(Button, data["name"], None)
+    return None
 
 # CustomTkinter Ayarları
 ctk.set_appearance_mode("dark")
@@ -99,6 +135,7 @@ class MouseClicker(threading.Thread):
         super().__init__()
         self.cps = 10
         self.buttons = [Button.left]
+        self.jitter = False
         self.running = False
         self.program_running = True
         self.daemon = True
@@ -123,7 +160,10 @@ class MouseClicker(threading.Thread):
                         mouse_controller.click(button)
                 except Exception:
                     pass
-                time.sleep(1.0 / self.cps)
+                delay = 1.0 / self.cps
+                if self.jitter:
+                    delay *= random.uniform(0.85, 1.15)
+                time.sleep(delay)
             else:
                 time.sleep(0.01)
 
@@ -135,6 +175,7 @@ class KeyboardKeyer(threading.Thread):
         self.mode = "hold"  # "hold" veya "tap"
         self.tap_type = "together"  # "together" (Aynı Anda) veya "sequence" (Sırayla)
         self.delay = 0.1  # Saniye
+        self.jitter = False
         self.running = False
         self.program_running = True
         self.daemon = True
@@ -183,7 +224,10 @@ class KeyboardKeyer(threading.Thread):
                             keyboard_controller.release(key)
                         except Exception:
                             pass
-                    time.sleep(self.delay)
+                    delay = self.delay
+                    if self.jitter:
+                        delay *= random.uniform(0.85, 1.15)
+                    time.sleep(delay)
                 else:
                     # Tuşlara sırayla bas-bırak yap
                     for key in self.target_keys:
@@ -194,7 +238,10 @@ class KeyboardKeyer(threading.Thread):
                             keyboard_controller.release(key)
                         except Exception:
                             pass
-                        time.sleep(self.delay)
+                        delay = self.delay
+                        if self.jitter:
+                            delay *= random.uniform(0.85, 1.15)
+                        time.sleep(delay)
             else:
                 time.sleep(0.01)
 
@@ -211,8 +258,12 @@ class MantıClickerApp(ctk.CTk):
         super().__init__()
 
         self.title("MantıClicker")
-        self.geometry("560x520")
+        self.geometry("560x550")
         self.resizable(False, False)
+
+        # Genel Ayar Değişkenleri
+        self.var_sound_enabled = ctk.BooleanVar(value=True)
+        self.var_tray_enabled = ctk.BooleanVar(value=False)
 
         # Kapatıldığında temizlik yapması için protokol ekleme
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -232,14 +283,16 @@ class MantıClickerApp(ctk.CTk):
         self.subtitle_label.pack(pady=(0, 5))
 
         # Sekme Yapısı
-        self.tabview = ctk.CTkTabview(self, width=520, height=380)
+        self.tabview = ctk.CTkTabview(self, width=520, height=410)
         self.tabview.pack(padx=20, pady=(5, 10))
 
         self.tab_mouse = self.tabview.add("Fare Makrosu (Clicker)")
         self.tab_keyboard = self.tabview.add("Klavye Makrosu (Keyer)")
+        self.tab_settings = self.tabview.add("Genel Ayarlar")
 
         self.setup_mouse_tab()
         self.setup_keyboard_tab()
+        self.setup_settings_tab()
 
         # Alt Bilgi / Durum Barı
         self.status_bar = ctk.CTkLabel(
@@ -304,13 +357,22 @@ class MantıClickerApp(ctk.CTk):
         self.lbl_m_status = ctk.CTkLabel(self.tab_mouse, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
         self.lbl_m_status.grid(row=3, column=1, padx=20, pady=12, sticky="e")
 
+        # Jitter / Anti-Cheat
+        self.var_m_jitter = ctk.BooleanVar(value=False)
+        self.chk_m_jitter = ctk.CTkCheckBox(
+            self.tab_mouse, text="Anti-Cheat Koruması (Rastgele Jitter Tıklama)",
+            variable=self.var_m_jitter,
+            command=self.update_mouse_settings
+        )
+        self.chk_m_jitter.grid(row=4, column=0, columnspan=2, padx=20, pady=(5, 5), sticky="w")
+
         # Başlat/Durdur Butonu
         self.btn_m_toggle = ctk.CTkButton(
             self.tab_mouse, text=f"BAŞLAT ({key_to_string(mouse_hotkey)})",
             height=40, font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             command=self.toggle_mouse_macro
         )
-        self.btn_m_toggle.grid(row=4, column=0, columnspan=2, padx=20, pady=(15, 10), sticky="ew")
+        self.btn_m_toggle.grid(row=5, column=0, columnspan=2, padx=20, pady=(10, 10), sticky="ew")
 
     def setup_keyboard_tab(self):
         # Basılacak Hedef Tuşlar Listesi
@@ -394,13 +456,22 @@ class MantıClickerApp(ctk.CTk):
         self.lbl_k_status = ctk.CTkLabel(self.tab_keyboard, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
         self.lbl_k_status.grid(row=6, column=1, padx=20, pady=6, sticky="e")
 
+        # Jitter / Anti-Cheat
+        self.var_k_jitter = ctk.BooleanVar(value=False)
+        self.chk_k_jitter = ctk.CTkCheckBox(
+            self.tab_keyboard, text="Anti-Cheat Koruması (Rastgele Jitter Basım)",
+            variable=self.var_k_jitter,
+            command=self.update_keyboard_settings
+        )
+        self.chk_k_jitter.grid(row=7, column=0, columnspan=2, padx=20, pady=(5, 5), sticky="w")
+
         # Başlat/Durdur Butonu
         self.btn_k_toggle = ctk.CTkButton(
             self.tab_keyboard, text=f"BAŞLAT ({key_to_string(keyboard_hotkey)})",
             height=38, font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             command=self.toggle_keyboard_macro
         )
-        self.btn_k_toggle.grid(row=7, column=0, columnspan=2, padx=20, pady=(10, 5), sticky="ew")
+        self.btn_k_toggle.grid(row=8, column=0, columnspan=2, padx=20, pady=(10, 5), sticky="ew")
 
     # Hedef tuşlar listesini metin haline getirme
     def get_keys_list_string(self):
@@ -457,6 +528,9 @@ class MantıClickerApp(ctk.CTk):
             clicker.cps = int(self.slider_cps.get())
         except ValueError:
             clicker.cps = 10
+            
+        # Jitter Güncelleme
+        clicker.jitter = self.var_m_jitter.get() if hasattr(self, 'var_m_jitter') else False
 
     def update_keyboard_settings(self, event=None):
         global keyboard_target_keys
@@ -485,6 +559,9 @@ class MantıClickerApp(ctk.CTk):
             keyer.delay = 0.1
             self.entry_k_delay.delete(0, "end")
             self.entry_k_delay.insert(0, "100")
+            
+        # Jitter Güncelleme
+        keyer.jitter = self.var_k_jitter.get() if hasattr(self, 'var_k_jitter') else False
 
     # Kısayol / Tuş Atama Yönetimi
     def start_binding(self, mode):
@@ -570,26 +647,31 @@ class MantıClickerApp(ctk.CTk):
     def toggle_mouse_macro(self):
         if clicker.running:
             clicker.stop_clicking()
+            self.trigger_sound("stop")
             self.lbl_m_status.configure(text="PASİF", text_color="#e74c3c")
             self.btn_m_toggle.configure(text=f"BAŞLAT ({key_to_string(mouse_hotkey)})", fg_color=["#3b82f6", "#1d4ed8"])
             self.combo_btn.configure(state="normal")
             self.slider_cps.configure(state="normal")
             self.entry_cps.configure(state="normal")
             self.btn_m_hk.configure(state="normal")
+            self.chk_m_jitter.configure(state="normal")
         else:
             self.update_mouse_settings()
             clicker.start_clicking()
+            self.trigger_sound("start")
             self.lbl_m_status.configure(text="AKTİF", text_color="#2ecc71")
             self.btn_m_toggle.configure(text=f"DURDUR ({key_to_string(mouse_hotkey)})", fg_color="#e74c3c", hover_color="#c0392b")
             self.combo_btn.configure(state="disabled")
             self.slider_cps.configure(state="disabled")
             self.entry_cps.configure(state="disabled")
             self.btn_m_hk.configure(state="disabled")
+            self.chk_m_jitter.configure(state="disabled")
 
     # Klavye Makrosu Başlat / Durdur
     def toggle_keyboard_macro(self):
         if keyer.running:
             keyer.stop_keyer()
+            self.trigger_sound("stop")
             self.lbl_k_status.configure(text="PASİF", text_color="#e74c3c")
             self.btn_k_toggle.configure(text=f"BAŞLAT ({key_to_string(keyboard_hotkey)})", fg_color=["#3b82f6", "#1d4ed8"])
             self.btn_k_add.configure(state="normal")
@@ -599,12 +681,14 @@ class MantıClickerApp(ctk.CTk):
                 self.entry_k_delay.configure(state="normal")
                 self.combo_k_type.configure(state="normal")
             self.btn_k_hk.configure(state="normal")
+            self.chk_k_jitter.configure(state="normal")
         else:
             if not keyboard_target_keys:
                 messagebox.showwarning("Hedef Tuş Yok", "Lütfen önce basılacak en az bir hedef tuş belirleyin.")
                 return
             self.update_keyboard_settings()
             keyer.start_keyer()
+            self.trigger_sound("start")
             self.lbl_k_status.configure(text="AKTİF", text_color="#2ecc71")
             self.btn_k_toggle.configure(text=f"DURDUR ({key_to_string(keyboard_hotkey)})", fg_color="#e74c3c", hover_color="#c0392b")
             self.btn_k_add.configure(state="disabled")
@@ -613,8 +697,15 @@ class MantıClickerApp(ctk.CTk):
             self.entry_k_delay.configure(state="disabled")
             self.combo_k_type.configure(state="disabled")
             self.btn_k_hk.configure(state="disabled")
+            self.chk_k_jitter.configure(state="disabled")
 
     def on_closing(self):
+        if self.var_tray_enabled.get():
+            self.minimize_to_tray()
+        else:
+            self.quit_app_completely()
+
+    def quit_app_completely(self):
         # Arka plan iş parçacıklarını durdur
         clicker.program_running = False
         clicker.stop_clicking()
@@ -634,6 +725,234 @@ class MantıClickerApp(ctk.CTk):
             
         self.destroy()
         sys.exit()
+
+    def minimize_to_tray(self):
+        self.withdraw()
+        
+        def create_image():
+            image = Image.new('RGB', (64, 64), color=(30, 41, 59))
+            dc = ImageDraw.Draw(image)
+            dc.ellipse([8, 8, 56, 56], fill=(59, 130, 246))
+            dc.line([(20, 44), (20, 20), (32, 32), (44, 20), (44, 44)], fill=(255, 255, 255), width=4)
+            return image
+
+        def show_window(icon, item):
+            icon.stop()
+            self.after(0, self.deiconify)
+
+        def quit_app(icon, item):
+            icon.stop()
+            self.after(0, self.quit_app_completely)
+
+        icon_image = create_image()
+        menu = (item('Göster', show_window), item('Çıkış', quit_app))
+        self.tray_icon = pystray.Icon("MantıClicker", icon_image, "MantıClicker", menu)
+        
+        threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def setup_settings_tab(self):
+        # Profil Bölümü
+        self.profile_frame = ctk.CTkFrame(self.tab_settings, fg_color="transparent")
+        self.profile_frame.pack(fill="x", padx=20, pady=15)
+        
+        self.lbl_profile_title = ctk.CTkLabel(self.profile_frame, text="Profil Yönetimi (Profil Kaydet/Yükle)", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
+        self.lbl_profile_title.pack(anchor="w", pady=(0, 10))
+        
+        self.profile_buttons_frame = ctk.CTkFrame(self.profile_frame, fg_color="transparent")
+        self.profile_buttons_frame.pack(fill="x")
+        
+        self.btn_save_profile = ctk.CTkButton(
+            self.profile_buttons_frame, text="Profil Kaydet",
+            fg_color="#3498db", hover_color="#2980b9",
+            command=self.save_profile
+        )
+        self.btn_save_profile.pack(side="left", padx=(0, 10), expand=True, fill="x")
+        
+        self.btn_load_profile = ctk.CTkButton(
+            self.profile_buttons_frame, text="Profil Yükle",
+            fg_color="#2ecc71", hover_color="#27ae60",
+            command=self.load_profile
+        )
+        self.btn_load_profile.pack(side="left", padx=(10, 0), expand=True, fill="x")
+        
+        # Çizgi ayırıcı
+        separator = ctk.CTkFrame(self.tab_settings, height=2, fg_color="#34495e")
+        separator.pack(fill="x", padx=20, pady=10)
+        
+        # Ses Ayarları Bölümü
+        self.sound_frame = ctk.CTkFrame(self.tab_settings, fg_color="transparent")
+        self.sound_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.lbl_sound_title = ctk.CTkLabel(self.sound_frame, text="Sesli Bildirim Ayarları", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
+        self.lbl_sound_title.pack(anchor="w", pady=(0, 10))
+        
+        self.sound_controls_frame = ctk.CTkFrame(self.sound_frame, fg_color="transparent")
+        self.sound_controls_frame.pack(fill="x")
+        
+        self.sw_sound = ctk.CTkSwitch(self.sound_controls_frame, text="Sesli Bildirim Aktif", variable=self.var_sound_enabled)
+        self.sw_sound.pack(side="left")
+        
+        self.combo_sound = ctk.CTkOptionMenu(
+            self.sound_controls_frame, values=["Klasik", "Melodik", "Çift Tık", "Bas"],
+            width=120
+        )
+        self.combo_sound.pack(side="right")
+        self.combo_sound.set("Klasik")
+        
+        # Çizgi ayırıcı 2
+        separator2 = ctk.CTkFrame(self.tab_settings, height=2, fg_color="#34495e")
+        separator2.pack(fill="x", padx=20, pady=10)
+        
+        # Sistem Tepsisi Ayarları Bölümü
+        self.tray_frame = ctk.CTkFrame(self.tab_settings, fg_color="transparent")
+        self.tray_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.lbl_tray_title = ctk.CTkLabel(self.tray_frame, text="Sistem Tepsisi Ayarları", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
+        self.lbl_tray_title.pack(anchor="w", pady=(0, 10))
+        
+        self.sw_tray = ctk.CTkSwitch(self.tray_frame, text="Kapatınca Arka Plana At (Sistem Tepsisi)", variable=self.var_tray_enabled)
+        self.sw_tray.pack(anchor="w")
+
+    def save_profile(self):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON Files", "*.json")],
+            title="Profili Kaydet"
+        )
+        if not file_path:
+            return
+        
+        try:
+            global mouse_hotkey, keyboard_hotkey, keyboard_target_keys
+            
+            profile_data = {
+                # Fare Ayarları
+                "mouse_button": self.combo_btn.get(),
+                "mouse_cps": int(self.slider_cps.get()),
+                "mouse_hotkey": serialize_key(mouse_hotkey),
+                "mouse_jitter": self.var_m_jitter.get(),
+                
+                # Klavye Ayarları
+                "keyboard_target_keys": [serialize_key(k) for k in keyboard_target_keys],
+                "keyboard_mode": self.seg_k_mode.get(),
+                "keyboard_tap_type": self.combo_k_type.get(),
+                "keyboard_delay": self.entry_k_delay.get(),
+                "keyboard_hotkey": serialize_key(keyboard_hotkey),
+                "keyboard_jitter": self.var_k_jitter.get(),
+                
+                # Genel Ayarlar
+                "sound_enabled": self.var_sound_enabled.get(),
+                "sound_profile": self.combo_sound.get(),
+                "minimize_to_tray": self.var_tray_enabled.get()
+            }
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(profile_data, f, indent=4, ensure_ascii=False)
+                
+            messagebox.showinfo("Başarılı", "Profil başarıyla kaydedildi.")
+        except Exception as e:
+            messagebox.showerror("Hata", f"Profil kaydedilirken bir hata oluştu:\n{e}")
+
+    def load_profile(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("JSON Files", "*.json")],
+            title="Profili Yükle"
+        )
+        if not file_path:
+            return
+        
+        try:
+            global mouse_hotkey, keyboard_hotkey, keyboard_target_keys
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                profile_data = json.load(f)
+                
+            # Fare Ayarlarını Yükleme
+            if "mouse_button" in profile_data:
+                self.combo_btn.set(profile_data["mouse_button"])
+            if "mouse_cps" in profile_data:
+                cps = profile_data["mouse_cps"]
+                self.slider_cps.set(cps)
+                self.entry_cps.delete(0, "end")
+                self.entry_cps.insert(0, str(cps))
+            if "mouse_hotkey" in profile_data:
+                loaded_m_hk = deserialize_key(profile_data["mouse_hotkey"])
+                if loaded_m_hk:
+                    mouse_hotkey = loaded_m_hk
+            if "mouse_jitter" in profile_data:
+                self.var_m_jitter.set(profile_data["mouse_jitter"])
+                
+            # Klavye Ayarlarını Yükleme
+            if "keyboard_target_keys" in profile_data:
+                keyboard_target_keys = [deserialize_key(k) for k in profile_data["keyboard_target_keys"] if deserialize_key(k) is not None]
+            if "keyboard_mode" in profile_data:
+                self.seg_k_mode.set(profile_data["keyboard_mode"])
+                self.on_keyboard_mode_change(profile_data["keyboard_mode"])
+            if "keyboard_tap_type" in profile_data:
+                self.combo_k_type.set(profile_data["keyboard_tap_type"])
+            if "keyboard_delay" in profile_data:
+                self.entry_k_delay.delete(0, "end")
+                self.entry_k_delay.insert(0, profile_data["keyboard_delay"])
+            if "keyboard_hotkey" in profile_data:
+                loaded_k_hk = deserialize_key(profile_data["keyboard_hotkey"])
+                if loaded_k_hk:
+                    keyboard_hotkey = loaded_k_hk
+            if "keyboard_jitter" in profile_data:
+                self.var_k_jitter.set(profile_data["keyboard_jitter"])
+                
+            # Genel Ayarları Yükleme
+            if "sound_enabled" in profile_data:
+                self.var_sound_enabled.set(profile_data["sound_enabled"])
+            if "sound_profile" in profile_data:
+                self.combo_sound.set(profile_data["sound_profile"])
+            if "minimize_to_tray" in profile_data:
+                self.var_tray_enabled.set(profile_data["minimize_to_tray"])
+                
+            # Ayarları motorlara ve arayüze yansıtma
+            self.update_mouse_settings()
+            self.update_keyboard_settings()
+            self.stop_binding_ui()
+            
+            messagebox.showinfo("Başarılı", "Profil başarıyla yüklendi.")
+        except Exception as e:
+            messagebox.showerror("Hata", f"Profil yüklenirken bir hata oluştu:\n{e}")
+
+    def play_sound_async(self, action):
+        if not self.var_sound_enabled.get():
+            return
+        try:
+            profile = self.combo_sound.get()
+            if profile == "Klasik":
+                if action == "start":
+                    winsound.Beep(1000, 150)
+                else:
+                    winsound.Beep(750, 150)
+            elif profile == "Melodik":
+                if action == "start":
+                    winsound.Beep(600, 80)
+                    winsound.Beep(900, 80)
+                else:
+                    winsound.Beep(900, 80)
+                    winsound.Beep(600, 80)
+            elif profile == "Çift Tık":
+                if action == "start":
+                    winsound.Beep(1200, 50)
+                    time.sleep(0.03)
+                    winsound.Beep(1200, 50)
+                else:
+                    winsound.Beep(600, 50)
+                    time.sleep(0.03)
+                    winsound.Beep(600, 50)
+            elif profile == "Bas":
+                if action == "start":
+                    winsound.Beep(400, 200)
+                else:
+                    winsound.Beep(300, 200)
+        except Exception:
+            pass
+
+    def trigger_sound(self, action):
+        threading.Thread(target=self.play_sound_async, args=(action,), daemon=True).start()
 
 if __name__ == "__main__":
     app = MantıClickerApp()
