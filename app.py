@@ -44,6 +44,91 @@ def deserialize_key(data):
             return getattr(Button, data["name"], None)
     return None
 
+# Premium Logo Üretici
+def create_premium_logo():
+    img = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    # Parıltılı dış daireler
+    for r in range(58, 46, -1):
+        alpha = int(120 * (1 - (58 - r) / 12))
+        draw.ellipse([60-r, 60-r, 60+r, 60+r], outline=(241, 196, 15, alpha), width=1)
+        
+    # Koyu mavi taban
+    draw.ellipse([60-46, 60-46, 60+46, 60+46], fill=(30, 41, 59, 255))
+    
+    # Mantı Şekli (Altın sarısı bohça)
+    draw.chord([60-25, 60-10, 60+25, 60+25], start=0, end=180, fill=(241, 196, 15, 255))
+    draw.polygon([(60-20, 60+10), (60-25, 60-15), (60-10, 60-5)], fill=(244, 208, 63, 255))
+    draw.polygon([(60+20, 60+10), (60+25, 60-15), (60+10, 60-5)], fill=(244, 208, 63, 255))
+    draw.polygon([(60-12, 60+5), (60, 60-22), (60+12, 60+5)], fill=(245, 215, 110, 255))
+    draw.ellipse([60-4, 60-24, 60+4, 60-16], fill=(241, 196, 15, 255))
+
+    # Tıklama İmleci (Cursor)
+    cursor_points = [
+        (60+5, 60+5),
+        (60+23, 60+15),
+        (60+17, 60+17),
+        (60+23, 60+26)
+    ]
+    draw.polygon([(x+2, y+2) for x, y in cursor_points], fill=(0, 0, 0, 100))
+    draw.polygon(cursor_points, fill=(255, 255, 255, 255))
+    draw.polygon(cursor_points, outline=(59, 130, 246, 255), width=2)
+    
+    return img
+
+# Animasyonlu Glowing Status Indicator
+class GlowingStatusIndicator(ctk.CTkCanvas):
+    def __init__(self, parent, size=30, **kwargs):
+        super().__init__(parent, width=size, height=size, bg="#2b2b2b", highlightthickness=0, **kwargs)
+        self.size = size
+        self.active = False
+        self.pulse_radius = 6
+        self.pulse_alpha = 255
+        self.draw_indicator()
+        self.animate()
+
+    def set_status(self, active):
+        self.active = active
+        self.pulse_radius = 6
+        self.pulse_alpha = 255
+        self.draw_indicator()
+
+    def draw_indicator(self):
+        self.delete("all")
+        center = self.size / 2
+        if not self.active:
+            self.create_oval(center - 5, center - 5, center + 5, center + 5, fill="#e74c3c", outline="")
+        else:
+            # Nabız halkası (Glow ring)
+            r = self.pulse_radius
+            if r > 5:
+                color = self.get_glow_color(self.pulse_alpha)
+                self.create_oval(center - r, center - r, center + r, center + r, fill=color, outline="")
+            self.create_oval(center - 5, center - 5, center + 5, center + 5, fill="#2ecc71", outline="")
+
+    def get_glow_color(self, alpha):
+        # Arka plan rengi olan #2b2b2b (43, 43, 43) ile yeşil #2ecc71 (46, 204, 113) arasında geçiş taklidi
+        ratio = alpha / 255.0
+        r = int(43 * (1 - ratio) + 46 * ratio)
+        g = int(43 * (1 - ratio) + 204 * ratio)
+        b = int(43 * (1 - ratio) + 113 * ratio)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def animate(self):
+        if self.active:
+            self.pulse_radius += 0.8
+            self.pulse_alpha = max(0, int(255 * (1 - (self.pulse_radius / (self.size / 2)))))
+            if self.pulse_radius >= self.size / 2:
+                self.pulse_radius = 5
+                self.pulse_alpha = 255
+            self.draw_indicator()
+        else:
+            self.pulse_radius = 5
+            self.pulse_alpha = 255
+            
+        self.after(35, self.animate)
+
 # CustomTkinter Ayarları
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -260,6 +345,9 @@ class MantıClickerApp(ctk.CTk):
         self.title("MantıClicker")
         self.geometry("560x550")
         self.resizable(False, False)
+        
+        # Fade-in Başlangıcı
+        self.attributes('-alpha', 0.0)
 
         # Genel Ayar Değişkenleri
         self.var_sound_enabled = ctk.BooleanVar(value=True)
@@ -268,12 +356,22 @@ class MantıClickerApp(ctk.CTk):
         # Kapatıldığında temizlik yapması için protokol ekleme
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        # Başlık Bölümü
+        # Başlık Bölümü (Logo ve Yazı Yana Yana)
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.header_frame.pack(pady=(15, 5))
+
+        self.logo_image = ctk.CTkImage(light_image=create_premium_logo(), dark_image=create_premium_logo(), size=(42, 42))
+        self.lbl_logo = ctk.CTkLabel(self.header_frame, image=self.logo_image, text="")
+        self.lbl_logo.pack(side="left", padx=(0, 10))
+
+        title_text_frame = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        title_text_frame.pack(side="left")
+
         self.title_label = ctk.CTkLabel(
-            self, text="MantıClicker",
-            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
+            title_text_frame, text="MantıClicker",
+            font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold")
         )
-        self.title_label.pack(pady=(15, 5))
+        self.title_label.pack(anchor="w")
 
         self.subtitle_label = ctk.CTkLabel(
             self, text="Çoklu Tuş Destekli Gelişmiş Makro Aracı",
@@ -293,6 +391,9 @@ class MantıClickerApp(ctk.CTk):
         self.setup_mouse_tab()
         self.setup_keyboard_tab()
         self.setup_settings_tab()
+
+        # Fade-in Animasyonunu Tetikle
+        self.fade_in()
 
         # Alt Bilgi / Durum Barı
         self.status_bar = ctk.CTkLabel(
@@ -354,8 +455,14 @@ class MantıClickerApp(ctk.CTk):
         self.lbl_m_status_title = ctk.CTkLabel(self.tab_mouse, text="Durum:", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
         self.lbl_m_status_title.grid(row=3, column=0, padx=20, pady=12, sticky="w")
 
-        self.lbl_m_status = ctk.CTkLabel(self.tab_mouse, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
-        self.lbl_m_status.grid(row=3, column=1, padx=20, pady=12, sticky="e")
+        self.m_status_frame = ctk.CTkFrame(self.tab_mouse, fg_color="transparent")
+        self.m_status_frame.grid(row=3, column=1, padx=20, pady=12, sticky="e")
+
+        self.lbl_m_status = ctk.CTkLabel(self.m_status_frame, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
+        self.lbl_m_status.pack(side="left", padx=(0, 8))
+
+        self.m_status_indicator = GlowingStatusIndicator(self.m_status_frame, size=24)
+        self.m_status_indicator.pack(side="left")
 
         # Jitter / Anti-Cheat
         self.var_m_jitter = ctk.BooleanVar(value=False)
@@ -453,8 +560,14 @@ class MantıClickerApp(ctk.CTk):
         self.lbl_k_status_title = ctk.CTkLabel(self.tab_keyboard, text="Durum:", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"))
         self.lbl_k_status_title.grid(row=6, column=0, padx=20, pady=6, sticky="w")
 
-        self.lbl_k_status = ctk.CTkLabel(self.tab_keyboard, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
-        self.lbl_k_status.grid(row=6, column=1, padx=20, pady=6, sticky="e")
+        self.k_status_frame = ctk.CTkFrame(self.tab_keyboard, fg_color="transparent")
+        self.k_status_frame.grid(row=6, column=1, padx=20, pady=6, sticky="e")
+
+        self.lbl_k_status = ctk.CTkLabel(self.k_status_frame, text="PASİF", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"), text_color="#e74c3c")
+        self.lbl_k_status.pack(side="left", padx=(0, 8))
+
+        self.k_status_indicator = GlowingStatusIndicator(self.k_status_frame, size=24)
+        self.k_status_indicator.pack(side="left")
 
         # Jitter / Anti-Cheat
         self.var_k_jitter = ctk.BooleanVar(value=False)
@@ -649,6 +762,7 @@ class MantıClickerApp(ctk.CTk):
             clicker.stop_clicking()
             self.trigger_sound("stop")
             self.lbl_m_status.configure(text="PASİF", text_color="#e74c3c")
+            self.m_status_indicator.set_status(False)
             self.btn_m_toggle.configure(text=f"BAŞLAT ({key_to_string(mouse_hotkey)})", fg_color=["#3b82f6", "#1d4ed8"])
             self.combo_btn.configure(state="normal")
             self.slider_cps.configure(state="normal")
@@ -660,6 +774,7 @@ class MantıClickerApp(ctk.CTk):
             clicker.start_clicking()
             self.trigger_sound("start")
             self.lbl_m_status.configure(text="AKTİF", text_color="#2ecc71")
+            self.m_status_indicator.set_status(True)
             self.btn_m_toggle.configure(text=f"DURDUR ({key_to_string(mouse_hotkey)})", fg_color="#e74c3c", hover_color="#c0392b")
             self.combo_btn.configure(state="disabled")
             self.slider_cps.configure(state="disabled")
@@ -673,6 +788,7 @@ class MantıClickerApp(ctk.CTk):
             keyer.stop_keyer()
             self.trigger_sound("stop")
             self.lbl_k_status.configure(text="PASİF", text_color="#e74c3c")
+            self.k_status_indicator.set_status(False)
             self.btn_k_toggle.configure(text=f"BAŞLAT ({key_to_string(keyboard_hotkey)})", fg_color=["#3b82f6", "#1d4ed8"])
             self.btn_k_add.configure(state="normal")
             self.btn_k_clear.configure(state="normal")
@@ -690,6 +806,7 @@ class MantıClickerApp(ctk.CTk):
             keyer.start_keyer()
             self.trigger_sound("start")
             self.lbl_k_status.configure(text="AKTİF", text_color="#2ecc71")
+            self.k_status_indicator.set_status(True)
             self.btn_k_toggle.configure(text=f"DURDUR ({key_to_string(keyboard_hotkey)})", fg_color="#e74c3c", hover_color="#c0392b")
             self.btn_k_add.configure(state="disabled")
             self.btn_k_clear.configure(state="disabled")
@@ -699,8 +816,26 @@ class MantıClickerApp(ctk.CTk):
             self.btn_k_hk.configure(state="disabled")
             self.chk_k_jitter.configure(state="disabled")
 
+    def fade_in(self):
+        alpha = self.attributes('-alpha')
+        if alpha < 1.0:
+            alpha += 0.05
+            self.attributes('-alpha', alpha)
+            self.after(10, self.fade_in)
+
+    def fade_out_to_tray(self):
+        alpha = self.attributes('-alpha')
+        if alpha > 0.0:
+            alpha -= 0.08
+            self.attributes('-alpha', alpha)
+            self.after(10, self.fade_out_to_tray)
+        else:
+            self.withdraw()
+            self.attributes('-alpha', 1.0) # Reset alpha for next restore
+
     def on_closing(self):
         if self.var_tray_enabled.get():
+            self.fade_out_to_tray()
             self.minimize_to_tray()
         else:
             self.quit_app_completely()
@@ -727,28 +862,24 @@ class MantıClickerApp(ctk.CTk):
         sys.exit()
 
     def minimize_to_tray(self):
-        self.withdraw()
-        
-        def create_image():
-            image = Image.new('RGB', (64, 64), color=(30, 41, 59))
-            dc = ImageDraw.Draw(image)
-            dc.ellipse([8, 8, 56, 56], fill=(59, 130, 246))
-            dc.line([(20, 44), (20, 20), (32, 32), (44, 20), (44, 44)], fill=(255, 255, 255), width=4)
-            return image
-
         def show_window(icon, item):
             icon.stop()
-            self.after(0, self.deiconify)
+            self.after(0, self.deiconify_with_fade)
 
         def quit_app(icon, item):
             icon.stop()
             self.after(0, self.quit_app_completely)
 
-        icon_image = create_image()
+        icon_image = create_premium_logo()
         menu = (item('Göster', show_window), item('Çıkış', quit_app))
         self.tray_icon = pystray.Icon("MantıClicker", icon_image, "MantıClicker", menu)
         
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def deiconify_with_fade(self):
+        self.deiconify()
+        self.attributes('-alpha', 0.0)
+        self.fade_in()
 
     def setup_settings_tab(self):
         # Profil Bölümü
@@ -955,5 +1086,11 @@ class MantıClickerApp(ctk.CTk):
         threading.Thread(target=self.play_sound_async, args=(action,), daemon=True).start()
 
 if __name__ == "__main__":
+    if not os.path.exists("logo.ico"):
+        try:
+            create_premium_logo().save("logo.ico", format="ICO")
+        except Exception:
+            pass
+            
     app = MantıClickerApp()
     app.mainloop()
